@@ -79,6 +79,8 @@ if 'last_logged_salary' not in st.session_state:
     st.session_state.last_logged_salary = None
 if 'log_sent' not in st.session_state:
     st.session_state.log_sent = False
+if 'start_time' not in st.session_state:
+    st.session_state.start_time = None
 
 # Fonction de calcul du salaire net
 def calculate_net_salary(brut_annuel, statut):
@@ -119,8 +121,6 @@ st.title("💰 Visualisation des revenus en temps réel")
 
 # Sidebar pour la configuration
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    
     # Section Salaire
     st.subheader("💼 Informations Salariales")
     salaire_brut_annuel = st.number_input(
@@ -227,11 +227,40 @@ with st.sidebar:
         step=10
     )
     
+    # Transport
+    st.subheader("🚇 Transport")
+    abonnement_transport = st.number_input(
+        "Abonnement transport mensuel (€)",
+        min_value=0,
+        value=0,
+        step=5,
+        help="Montant total de votre abonnement transport"
+    )
+    
+    pourcentage_remboursement = st.slider(
+        "% de remboursement employeur",
+        0, 100, 50, 1,
+        help="Pourcentage pris en charge par votre employeur"
+    )
+    
+    # Calcul de la part salariale du transport
+    part_salariale_transport = abonnement_transport * (1 - pourcentage_remboursement / 100)
+    
+    if abonnement_transport > 0:
+        st.caption(f"Part employeur: {abonnement_transport * pourcentage_remboursement / 100:.2f} € | Part salariale: {part_salariale_transport:.2f} €")
+    
     autres_deductions = st.number_input(
         "Autres déductions mensuelles (€)",
         min_value=0,
         value=0,
         step=10
+    )
+    
+    # Signature en bas de la sidebar
+    st.divider()
+    st.markdown(
+        "<p style='text-align: center; font-size: 11px; font-style: italic; color: #888888;'>Application créée par Tristan BANNIER.</p>",
+        unsafe_allow_html=True
     )
 
 # Calculs
@@ -242,7 +271,7 @@ if mode_impot == "Taux de prélèvement":
 else:
     impot_annuel = calculate_impot(net_avant_impot, parts_fiscales, autres_revenus)
 
-deductions_annuelles = (mutuelle + retraite_supp + autres_deductions) * 12
+deductions_annuelles = (mutuelle + retraite_supp + part_salariale_transport + autres_deductions) * 12
 net_apres_impot_annuel = net_avant_impot - impot_annuel - deductions_annuelles
 
 # Calcul des revenus par période
@@ -294,10 +323,30 @@ with col1:
     with col_btn2:
         if st.button("🔄 Reset Journalier", use_container_width=True):
             st.session_state.total_earned_today = 0.0
+            st.session_state.start_time = None
             st.session_state.last_update = time.time()
     
     with col_btn3:
-        if st.button("🔃 Actualiser", use_container_width=True):
+        if st.button("🕐 Actualisation selon l'heure actuelle", use_container_width=True):
+            # Calculer le temps écoulé depuis le début de la journée
+            now = datetime.now()
+            current_time = now.time()
+            
+            if heure_debut <= current_time <= heure_fin:
+                # Calculer les secondes depuis heure_debut
+                debut_seconds = heure_debut.hour * 3600 + heure_debut.minute * 60 + heure_debut.second
+                current_seconds = current_time.hour * 3600 + current_time.minute * 60 + current_time.second
+                elapsed_seconds = current_seconds - debut_seconds
+                
+                # Calculer le revenu accumulé
+                st.session_state.total_earned_today = elapsed_seconds * revenu_par_seconde
+                st.session_state.start_time = now
+                st.session_state.last_update = time.time()
+                st.success(f"✅ Actualisé à {current_time.strftime('%H:%M:%S')}")
+            else:
+                st.warning("⚠️ Vous n'êtes pas dans vos heures de travail")
+            
+            time.sleep(1)
             st.rerun()
     
     # Compteur
@@ -333,8 +382,13 @@ with col2:
     
     if revenu_par_jour > 0:
         progression = (st.session_state.total_earned_today / revenu_par_jour) * 100
-        st.progress(min(progression / 100, 1.0))
+        progression_clamped = min(progression / 100, 1.0)
+        st.progress(progression_clamped)
         st.caption(f"Progression: {progression:.1f}%")
+        
+        # Afficher si l'objectif est atteint
+        if progression >= 100:
+            st.success("🎉 Objectif journalier atteint !")
 
 # Séparateur
 st.divider()
