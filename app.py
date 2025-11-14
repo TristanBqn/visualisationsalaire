@@ -126,7 +126,7 @@ with st.sidebar:
     salaire_brut_annuel = st.number_input(
         "Salaire brut annuel (€)",
         min_value=0,
-        value=45000,
+        value=99999,
         step=1000,
         help="Votre salaire brut annuel en euros"
     )
