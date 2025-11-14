@@ -115,12 +115,9 @@ def calculate_impot(net_avant_impot, parts_fiscales, autres_revenus):
     return impot_total
 
 # Interface utilisateur
-st.title("💰 Compteur de Revenu en Temps Réel")
-st.markdown("### Visualisez combien vous gagnez seconde après seconde")
+st.title("💰 Visualisation des revenus en temps réel")
 
 # Sidebar pour la configuration
-with st.sidebar:
-    st.header("⚙️ Configuration")
     
     # Section Salaire
     st.subheader("💼 Informations Salariales")
