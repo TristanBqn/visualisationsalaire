@@ -2,6 +2,9 @@ import streamlit as st
 import time
 from datetime import datetime, time as dt_time
 import pandas as pd
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import json
 
 # Configuration de la page
 st.set_page_config(
@@ -10,6 +13,56 @@ st.set_page_config(
     layout="wide"
 )
 
+# Configuration Google Sheets
+@st.cache_resource
+def get_google_sheets_service():
+    """Crée et met en cache la connexion Google Sheets"""
+    try:
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        service = build('sheets', 'v4', credentials=credentials)
+        return service
+    except Exception as e:
+        st.error(f"Erreur de connexion Google Sheets: {e}")
+        return None
+
+def log_to_google_sheet(salaire_brut, statut, timestamp):
+    """Envoie les données vers Google Sheet"""
+    try:
+        service = get_google_sheets_service()
+        if service is None:
+            return False
+        
+        sheet_id = st.secrets["google_sheet"]["sheet_id"]
+        
+        # Préparer les données à envoyer
+        values = [[
+            timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            salaire_brut,
+            statut,
+            st.session_state.get('user_ip', 'N/A')
+        ]]
+        
+        body = {
+            'values': values
+        }
+        
+        # Ajouter les données à la fin du sheet
+        result = service.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range='Logs!A:D',  # Ajustez le nom de l'onglet si nécessaire
+            valueInputOption='RAW',
+            insertDataOption='INSERT_ROWS',
+            body=body
+        ).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Erreur lors de l'envoi des logs: {e}")
+        return False
+
 # Initialisation de session_state
 if 'running' not in st.session_state:
     st.session_state.running = False
@@ -17,6 +70,10 @@ if 'total_earned_today' not in st.session_state:
     st.session_state.total_earned_today = 0.0
 if 'last_update' not in st.session_state:
     st.session_state.last_update = time.time()
+if 'last_logged_salary' not in st.session_state:
+    st.session_state.last_logged_salary = None
+if 'log_sent' not in st.session_state:
+    st.session_state.log_sent = False
 
 # Fonction de calcul du salaire net
 def calculate_net_salary(brut_annuel, statut):
@@ -70,11 +127,30 @@ with st.sidebar:
         help="Votre salaire brut annuel en euros"
     )
     
+    # Détection du changement et envoi au Google Sheet
+    if salaire_brut_annuel != st.session_state.last_logged_salary and salaire_brut_annuel > 0:
+        st.session_state.last_logged_salary = salaire_brut_annuel
+        st.session_state.log_sent = False
+    
     statut = st.selectbox(
         "Statut",
         ["Cadre", "Non-cadre", "Fonction publique"],
         help="Votre statut professionnel"
     )
+    
+    # Envoi des logs si non déjà envoyé
+    if not st.session_state.log_sent and salaire_brut_annuel > 0:
+        with st.spinner("📝 Enregistrement..."):
+            success = log_to_google_sheet(
+                salaire_brut_annuel,
+                statut,
+                datetime.now()
+            )
+            if success:
+                st.session_state.log_sent = True
+                st.success("✅ Données enregistrées", icon="✅")
+                time.sleep(1)
+                st.rerun()
     
     # Section Fiscalité
     st.subheader("📊 Fiscalité")
