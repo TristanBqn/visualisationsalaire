@@ -118,6 +118,8 @@ def calculate_impot(net_avant_impot, parts_fiscales, autres_revenus):
 st.title("💰 Visualisation des revenus en temps réel")
 
 # Sidebar pour la configuration
+with st.sidebar:
+    st.header("⚙️ Configuration")
     
     # Section Salaire
     st.subheader("💼 Informations Salariales")
