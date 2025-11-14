@@ -2,9 +2,8 @@ import streamlit as st
 import time
 from datetime import datetime, time as dt_time
 import pandas as pd
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-import json
+import gspread
+from google.oauth2.service_account import Credentials
 
 # Configuration de la page
 st.set_page_config(
@@ -15,15 +14,21 @@ st.set_page_config(
 
 # Configuration Google Sheets
 @st.cache_resource
-def get_google_sheets_service():
+def get_google_sheets_connection():
     """Crée et met en cache la connexion Google Sheets"""
     try:
-        credentials = service_account.Credentials.from_service_account_info(
+        scopes = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ]
+        
+        credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
-            scopes=['https://www.googleapis.com/auth/spreadsheets']
+            scopes=scopes
         )
-        service = build('sheets', 'v4', credentials=credentials)
-        return service
+        
+        client = gspread.authorize(credentials)
+        return client
     except Exception as e:
         st.error(f"Erreur de connexion Google Sheets: {e}")
         return None
@@ -31,34 +36,34 @@ def get_google_sheets_service():
 def log_to_google_sheet(salaire_brut, statut, timestamp):
     """Envoie les données vers Google Sheet"""
     try:
-        service = get_google_sheets_service()
-        if service is None:
+        client = get_google_sheets_connection()
+        if client is None:
             return False
         
         sheet_id = st.secrets["google_sheet"]["sheet_id"]
         
-        # Préparer les données à envoyer
-        values = [[
+        # Ouvrir le spreadsheet
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        # Ouvrir l'onglet "Logs" (créer s'il n'existe pas)
+        try:
+            worksheet = spreadsheet.worksheet("Logs")
+        except gspread.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="Logs", rows="1000", cols="4")
+            # Ajouter les en-têtes
+            worksheet.append_row(["Timestamp", "Salaire Brut", "Statut", "User Info"])
+        
+        # Ajouter la ligne de données
+        row_data = [
             timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             salaire_brut,
             statut,
-            st.session_state.get('user_ip', 'N/A')
-        ]]
+            "User"
+        ]
         
-        body = {
-            'values': values
-        }
-        
-        # Ajouter les données à la fin du sheet
-        result = service.spreadsheets().values().append(
-            spreadsheetId=sheet_id,
-            range='Logs!A:D',  # Ajustez le nom de l'onglet si nécessaire
-            valueInputOption='RAW',
-            insertDataOption='INSERT_ROWS',
-            body=body
-        ).execute()
-        
+        worksheet.append_row(row_data)
         return True
+        
     except Exception as e:
         st.error(f"Erreur lors de l'envoi des logs: {e}")
         return False
