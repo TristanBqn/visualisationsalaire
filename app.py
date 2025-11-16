@@ -394,7 +394,7 @@ with col2:
 st.divider()
 
 # Section comparaisons amusantes
-st.subheader("🎯 Comparaisons")
+st.subheader("Comparaisons")
 
 col1, col2, col3, col4 = st.columns(4)
 
