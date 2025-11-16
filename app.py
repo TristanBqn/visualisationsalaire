@@ -371,7 +371,7 @@ with col1:
         )
 
 with col2:
-    st.subheader("📈 Statistiques du Jour")
+    st.subheader("Statistiques du jour")
     temps_ecoule = st.session_state.total_earned_today / revenu_par_seconde if revenu_par_seconde > 0 else 0
     heures = int(temps_ecoule // 3600)
     minutes = int((temps_ecoule % 3600) // 60)
