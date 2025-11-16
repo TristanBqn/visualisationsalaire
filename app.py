@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 
 # Configuration de la page
 st.set_page_config(
-    page_title="💰 Compteur de Revenu",
+    page_title="💰 Compteur de revenu",
     page_icon="💰",
     layout="wide"
 )
@@ -292,13 +292,13 @@ is_work_hours = heure_debut <= now <= heure_fin
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("💶 Salaire Net Annuel", f"{net_apres_impot_annuel:,.2f} €")
+    st.metric("Salaire Net Annuel", f"{net_apres_impot_annuel:,.2f} €")
 with col2:
-    st.metric("📅 Revenu Mensuel", f"{revenu_mensuel:,.2f} €")
+    st.metric("Revenu Mensuel", f"{revenu_mensuel:,.2f} €")
 with col3:
-    st.metric("⏱️ Par Heure", f"{revenu_par_heure:.2f} €")
+    st.metric("Par Heure", f"{revenu_par_heure:.2f} €")
 with col4:
-    st.metric("⚡ Par Seconde", f"{revenu_par_seconde:.4f} €")
+    st.metric("Par Seconde", f"{revenu_par_seconde:.4f} €")
 
 # Séparateur
 st.divider()
@@ -307,7 +307,7 @@ st.divider()
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("🔄 Compteur en Temps Réel")
+    st.subheader("🔄 Compteur en temps réel")
     
     if not is_work_hours:
         st.warning(f"⏸️ Vous n'êtes pas dans vos heures de travail ({heure_debut.strftime('%H:%M')} - {heure_fin.strftime('%H:%M')})")
@@ -321,7 +321,7 @@ with col1:
             st.session_state.last_update = time.time()
     
     with col_btn2:
-        if st.button("🔄 Reset Journalier", use_container_width=True):
+        if st.button("🔄 Reset journalier", use_container_width=True):
             st.session_state.total_earned_today = 0.0
             st.session_state.start_time = None
             st.session_state.last_update = time.time()
@@ -377,8 +377,8 @@ with col2:
     minutes = int((temps_ecoule % 3600) // 60)
     secondes = int(temps_ecoule % 60)
     
-    st.metric("⏱️ Temps travaillé", f"{heures}h {minutes}m {secondes}s")
-    st.metric("🎯 Objectif journalier", f"{revenu_par_jour:.2f} €")
+    st.metric("Temps travaillé", f"{heures}h {minutes}m {secondes}s")
+    st.metric("Objectif journalier", f"{revenu_par_jour:.2f} €")
     
     if revenu_par_jour > 0:
         progression = (st.session_state.total_earned_today / revenu_par_jour) * 100
@@ -419,17 +419,17 @@ with st.expander("📊 Détails des Calculs"):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 💼 Décomposition du Salaire")
+        st.markdown("### Décomposition du salaire")
         charges_sociales = salaire_brut_annuel - net_avant_impot
         
         data = {
             "Poste": [
-                "Salaire Brut",
-                "Charges Sociales",
-                "Net Avant Impôt",
-                "Impôt sur le Revenu",
-                "Déductions Supplémentaires",
-                "Net Après Impôt"
+                "Salaire brut",
+                "Charges sociales",
+                "Net avant impôt",
+                "Impôt sur le revenu",
+                "Déductions supplémentaires",
+                "Net après impôt"
             ],
             "Montant (€)": [
                 f"{salaire_brut_annuel:,.2f}",
@@ -443,9 +443,9 @@ with st.expander("📊 Détails des Calculs"):
         st.dataframe(data, hide_index=True, use_container_width=True)
     
     with col2:
-        st.markdown("### ⏰ Répartition Temporelle")
+        st.markdown("### Répartition temporelle")
         data_temps = {
-            "Période": ["Par Seconde", "Par Minute", "Par Heure", "Par Jour", "Par Mois", "Par An"],
+            "Période": ["Par seconde", "Par minute", "Par heure", "Par jour", "Par mois", "Par an"],
             "Revenu (€)": [
                 f"{revenu_par_seconde:.4f}",
                 f"{revenu_par_minute:.2f}",
@@ -459,4 +459,4 @@ with st.expander("📊 Détails des Calculs"):
 
 # Footer
 st.divider()
-st.caption("⚠️ Ces calculs sont des approximations. Consultez un expert-comptable pour des calculs précis. Les taux de charges sociales et le barème fiscal sont basés sur 2024.")
+st.caption("Ces calculs sont des approximations. Ils ne valent pas les conseils d'un profesionnel agréé.")
