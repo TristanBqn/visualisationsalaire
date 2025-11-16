@@ -321,13 +321,13 @@ with col1:
             st.session_state.last_update = time.time()
     
     with col_btn2:
-        if st.button("Reset journalier", use_container_width=True):
+        if st.button("❌ Reset journalier", use_container_width=True):
             st.session_state.total_earned_today = 0.0
             st.session_state.start_time = None
             st.session_state.last_update = time.time()
     
     with col_btn3:
-        if st.button("🕐 Actualisation selon l'heure actuelle", use_container_width=True):
+        if st.button("🕐 Selon l'heure actuelle", use_container_width=True):
             # Calculer le temps écoulé depuis le début de la journée
             now = datetime.now()
             current_time = now.time()
