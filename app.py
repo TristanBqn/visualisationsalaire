@@ -321,7 +321,7 @@ with col1:
             st.session_state.last_update = time.time()
     
     with col_btn2:
-        if st.button("🔄 Reset journalier", use_container_width=True):
+        if st.button("Reset journalier", use_container_width=True):
             st.session_state.total_earned_today = 0.0
             st.session_state.start_time = None
             st.session_state.last_update = time.time()
