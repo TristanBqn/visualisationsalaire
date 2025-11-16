@@ -307,7 +307,7 @@ st.divider()
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("🔄 Compteur en temps réel")
+    st.subheader("Compteur en temps réel")
     
     if not is_work_hours:
         st.warning(f"⏸️ Vous n'êtes pas dans vos heures de travail ({heure_debut.strftime('%H:%M')} - {heure_fin.strftime('%H:%M')})")
