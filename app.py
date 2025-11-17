@@ -7,8 +7,7 @@ from google.oauth2.service_account import Credentials
 
 # Configuration de la page
 st.set_page_config(
-    page_title="💰 Compteur de revenu",
-    page_icon="💰",
+    page_title="Compteur de revenu",
     layout="wide"
 )
 
@@ -82,33 +81,23 @@ if 'log_sent' not in st.session_state:
 if 'start_time' not in st.session_state:
     st.session_state.start_time = None
 
-# Fonction de calcul du salaire net avant impôt
-def calculate_net_avant_impot(brut_annuel, statut):
-    """Calcule le salaire net avant impôt (après cotisations sociales)"""
+# Fonction de calcul du salaire net
+def calculate_net_salary(brut_annuel, statut):
+    """Calcule le salaire net avant impôt"""
     if statut == "Cadre":
-        taux_charges = 0.255  # 25.5% de charges sociales
+        taux_charges = 0.25  # ~25% de charges sociales
     else:
-        taux_charges = 0.23  # 23% pour non-cadre
+        taux_charges = 0.23  # ~23% pour non-cadre
     
     net_avant_impot = brut_annuel * (1 - taux_charges)
     return net_avant_impot
 
-# Fonction de calcul du net imposable
-def calculate_net_imposable(net_avant_impot):
-    """Calcule le net imposable (inclut CSG/CRDS non déductible)"""
-    return net_avant_impot * 1.07
-
-# Fonction de calcul de l'impôt avec barème progressif et décote
-def calculate_impot(net_imposable, parts_fiscales, autres_revenus, situation_familiale):
-    """Calcule l'impôt sur le revenu selon le barème progressif 2024 avec décote"""
+# Fonction de calcul de l'impôt
+def calculate_impot(net_avant_impot, parts_fiscales, autres_revenus):
+    """Calcule l'impôt sur le revenu selon le barème progressif 2024"""
+    revenu_imposable = (net_avant_impot + autres_revenus) / parts_fiscales
     
-    # Revenu total imposable du foyer
-    revenu_total_imposable = net_imposable + autres_revenus
-    
-    # Quotient familial : revenu par part
-    revenu_par_part = revenu_total_imposable / parts_fiscales
-    
-    # Barème progressif 2024
+    # Barème 2024
     tranches = [
         (0, 11294, 0),
         (11294, 28797, 0.11),
@@ -117,32 +106,14 @@ def calculate_impot(net_imposable, parts_fiscales, autres_revenus, situation_fam
         (177106, float('inf'), 0.45)
     ]
     
-    # Calcul de l'impôt par part
-    impot_par_part = 0
+    impot = 0
     for i, (min_tranche, max_tranche, taux) in enumerate(tranches):
-        if revenu_par_part > min_tranche:
-            base = min(revenu_par_part, max_tranche) - min_tranche
-            impot_par_part += base * taux
+        if revenu_imposable > min_tranche:
+            base = min(revenu_imposable, max_tranche) - min_tranche
+            impot += base * taux
     
-    # Impôt brut du foyer
-    impot_brut = impot_par_part * parts_fiscales
-    
-    # Application de la décote
-    if situation_familiale == "Célibataire":
-        decote = 833 - 0.4525 * impot_brut
-    else:  # Couple
-        decote = 1378 - 0.4525 * impot_brut
-    
-    # Appliquer la décote si positive
-    if decote > 0:
-        impot_final = impot_brut - decote
-    else:
-        impot_final = impot_brut
-    
-    # L'impôt ne peut pas être négatif
-    impot_final = max(0, impot_final)
-    
-    return impot_final, impot_brut, decote if decote > 0 else 0
+    impot_total = impot * parts_fiscales
+    return impot_total
 
 # Interface utilisateur
 st.title("💰 Visualisation des revenus en temps réel")
@@ -188,35 +159,26 @@ with st.sidebar:
     st.subheader("📊 Fiscalité")
     mode_impot = st.radio(
         "Mode de calcul impôt",
-        ["Calcul automatique (barème 2024)", "Taux de prélèvement manuel"]
+        ["Taux de prélèvement", "Calcul automatique"]
     )
     
-    if mode_impot == "Taux de prélèvement manuel":
+    if mode_impot == "Taux de prélèvement":
         taux_prelevement = st.slider(
             "Taux de prélèvement à la source (%)",
             0.0, 45.0, 10.0, 0.1
         ) / 100
     else:
-        situation_familiale = st.selectbox(
-            "Situation familiale",
-            ["Célibataire", "Couple"],
-            help="Pour le calcul de la décote"
-        )
-        
         parts_fiscales = st.number_input(
             "Nombre de parts fiscales",
             min_value=1.0,
             value=1.0,
-            step=0.5,
-            help="1 pour célibataire, 2 pour couple, +0.5 par enfant (jusqu'au 2ème), +1 à partir du 3ème"
+            step=0.5
         )
-        
         autres_revenus = st.number_input(
             "Autres revenus annuels du foyer (€)",
             min_value=0,
             value=0,
-            step=1000,
-            help="Revenus fonciers, BIC, BNC, etc."
+            step=1000
         )
     
     # Section Temps de travail
@@ -300,47 +262,26 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-# Calculs selon le pipeline correct
-# 1. Net avant impôt (après cotisations sociales)
-net_avant_impot = calculate_net_avant_impot(salaire_brut_annuel, statut)
+# Calculs
+net_avant_impot = calculate_net_salary(salaire_brut_annuel, statut)
 
-# 2. Net imposable (inclut CSG/CRDS non déductible)
-net_imposable = calculate_net_imposable(net_avant_impot)
-
-# 3. Calcul de l'impôt
-if mode_impot == "Taux de prélèvement manuel":
-    # Mode simplifié : application du taux sur le net avant impôt
+if mode_impot == "Taux de prélèvement":
     impot_annuel = net_avant_impot * taux_prelevement
-    impot_brut = impot_annuel
-    decote = 0
 else:
-    # Mode automatique : barème progressif 2024 avec décote
-    impot_annuel, impot_brut, decote = calculate_impot(
-        net_imposable, 
-        parts_fiscales, 
-        autres_revenus,
-        situation_familiale
-    )
+    impot_annuel = calculate_impot(net_avant_impot, parts_fiscales, autres_revenus)
 
-# 4. Net après impôt
-net_apres_impot_annuel = net_avant_impot - impot_annuel
+deductions_annuelles = (mutuelle + retraite_supp + part_salariale_transport + autres_deductions) * 12
+net_apres_impot_annuel = net_avant_impot - impot_annuel - deductions_annuelles
 
-# 5. Déductions personnelles mensuelles
-deductions_mensuelles = mutuelle + retraite_supp + part_salariale_transport + autres_deductions
-deductions_annuelles = deductions_mensuelles * 12
-
-# 6. Net cash réel (ce qui reste vraiment)
-net_cash_annuel = net_apres_impot_annuel - deductions_annuelles
-
-# Calcul des revenus par période (basé sur le net cash)
+# Calcul des revenus par période
 heures_travaillees_annuel = heures_semaine * semaines_travaillees
 secondes_travaillees_annuel = heures_travaillees_annuel * 3600
 
-revenu_par_seconde = net_cash_annuel / secondes_travaillees_annuel
+revenu_par_seconde = net_apres_impot_annuel / secondes_travaillees_annuel
 revenu_par_minute = revenu_par_seconde * 60
 revenu_par_heure = revenu_par_minute * 60
 revenu_par_jour = revenu_par_heure * (heures_semaine / 5)  # Supposant 5 jours/semaine
-revenu_mensuel = net_cash_annuel / 12
+revenu_mensuel = net_apres_impot_annuel / 12
 
 # Vérification des heures de travail
 now = datetime.now().time()
@@ -350,8 +291,7 @@ is_work_hours = heure_debut <= now <= heure_fin
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Net Cash Annuel", f"{net_cash_annuel:,.2f} €", 
-              help="Votre revenu réel après impôts et déductions")
+    st.metric("Salaire Net Annuel", f"{net_apres_impot_annuel:,.2f} €")
 with col2:
     st.metric("Revenu Mensuel", f"{revenu_mensuel:,.2f} €")
 with col3:
@@ -380,7 +320,7 @@ with col1:
             st.session_state.last_update = time.time()
     
     with col_btn2:
-        if st.button("⌫ Reset journalier", use_container_width=True):
+        if st.button("❌ Reset journalier", use_container_width=True):
             st.session_state.total_earned_today = 0.0
             st.session_state.start_time = None
             st.session_state.last_update = time.time()
@@ -474,7 +414,7 @@ with col4:
     st.info(f"📅 **Par semaine (5 jours)**\n\n{semaine:.2f} €")
 
 # Détails des calculs
-with st.expander("📊 Détails des Calculs (Pipeline fiscal 2024)"):
+with st.expander("📊 Détails des Calculs"):
     col1, col2 = st.columns(2)
     
     with col1:
@@ -482,64 +422,40 @@ with st.expander("📊 Détails des Calculs (Pipeline fiscal 2024)"):
         charges_sociales = salaire_brut_annuel - net_avant_impot
         
         data = {
-            "Étape": [
-                "1. Salaire brut annuel",
-                "2. Charges sociales salariales",
-                "3. Net avant impôt",
-                "4. Net imposable (×1.07)",
-                "5. Impôt brut (barème)",
-                "6. Décote appliquée",
-                "7. Impôt final",
-                "8. Net après impôt",
-                "9. Déductions mensuelles",
-                "10. Net cash réel"
+            "Poste": [
+                "Salaire brut",
+                "Charges sociales",
+                "Net avant impôt",
+                "Impôt sur le revenu",
+                "Déductions supplémentaires",
+                "Net après impôt"
             ],
             "Montant (€)": [
                 f"{salaire_brut_annuel:,.2f}",
                 f"-{charges_sociales:,.2f}",
                 f"{net_avant_impot:,.2f}",
-                f"{net_imposable:,.2f}",
-                f"{impot_brut:,.2f}",
-                f"-{decote:,.2f}" if decote > 0 else "0.00",
                 f"-{impot_annuel:,.2f}",
-                f"{net_apres_impot_annuel:,.2f}",
                 f"-{deductions_annuelles:,.2f}",
-                f"{net_cash_annuel:,.2f}"
+                f"{net_apres_impot_annuel:,.2f}"
             ]
         }
         st.dataframe(data, hide_index=True, use_container_width=True)
-        
-        if mode_impot != "Taux de prélèvement manuel":
-            taux_effectif = (impot_annuel / net_imposable * 100) if net_imposable > 0 else 0
-            st.caption(f"📌 Taux d'imposition effectif: **{taux_effectif:.2f}%**")
-            st.caption(f"📌 Quotient familial: {parts_fiscales} part(s)")
     
     with col2:
         st.markdown("### Répartition temporelle")
         data_temps = {
             "Période": ["Par seconde", "Par minute", "Par heure", "Par jour", "Par mois", "Par an"],
-            "Revenu net (€)": [
+            "Revenu (€)": [
                 f"{revenu_par_seconde:.4f}",
                 f"{revenu_par_minute:.2f}",
                 f"{revenu_par_heure:.2f}",
                 f"{revenu_par_jour:.2f}",
                 f"{revenu_mensuel:.2f}",
-                f"{net_cash_annuel:,.2f}"
+                f"{net_apres_impot_annuel:,.2f}"
             ]
         }
         st.dataframe(data_temps, hide_index=True, use_container_width=True)
-        
-        st.markdown("### Taux de prélèvement")
-        taux_total = ((salaire_brut_annuel - net_cash_annuel) / salaire_brut_annuel * 100) if salaire_brut_annuel > 0 else 0
-        taux_charges = (charges_sociales / salaire_brut_annuel * 100) if salaire_brut_annuel > 0 else 0
-        taux_impot = (impot_annuel / salaire_brut_annuel * 100) if salaire_brut_annuel > 0 else 0
-        taux_deductions = (deductions_annuelles / salaire_brut_annuel * 100) if salaire_brut_annuel > 0 else 0
-        
-        st.caption(f"💰 Charges sociales: **{taux_charges:.1f}%**")
-        st.caption(f"💰 Impôt sur le revenu: **{taux_impot:.1f}%**")
-        st.caption(f"💰 Déductions perso: **{taux_deductions:.1f}%**")
-        st.caption(f"💰 **Prélèvement total: {taux_total:.1f}%**")
 
 # Footer
 st.divider()
-st.caption("✅ Calculs conformes au barème progressif 2024 avec décote • Ces calculs sont des approximations basées sur la fiscalité française 2024. Consultez un expert-comptable pour votre situation personnelle.")
+st.caption("Ces calculs sont des approximations. Ils ne valent pas les conseils d'un profesionnel agréé.")
